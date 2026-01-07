@@ -7,3 +7,7 @@ COPY --chown=${SC_USER_NAME}:${SC_USER_NAME} osparc_python_runner_pytorch osparc
 RUN mv main.py osparc_python_runner_pytorch/main.py
 
 RUN uv pip install -r osparc_python_runner_pytorch/requirements.txt
+
+# Make venv writable for runtime package installation
+# The scu user needs to be able to install packages from user requirements.txt
+RUN chmod -R 777 /opt/venv
