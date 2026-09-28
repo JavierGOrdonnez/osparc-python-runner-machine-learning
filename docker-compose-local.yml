@@ -1,7 +1,9 @@
 services:
   runner-ml:
     image: simcore/services/comp/${IMAGE_TO_RUN}:${TAG_TO_RUN}
+    runtime: nvidia
     environment:
+      - NVIDIA_VISIBLE_DEVICES=all
       - INPUT_FOLDER=/tmp/inputs
       - OUTPUT_FOLDER=/tmp/outputs
     volumes:
