@@ -56,8 +56,6 @@ def main():
         "compose",
         "--file",
         "docker-compose-local.yml",
-        "--file",
-        "docker-compose-local-gpu.yml",
     ]
     project_name = f"ml-regression-{uuid.uuid4().hex}"
     project_command = command + ["--project-name", project_name]
