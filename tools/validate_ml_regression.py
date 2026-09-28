@@ -36,6 +36,22 @@ def _image_facts(image):
     return {"id": inspected["Id"], "size_bytes": inspected["Size"]}
 
 
+def validate_against_golden(result, golden):
+    """Asserts a runner result matches the golden fixture and used the GPU.
+
+    Raises AssertionError on prediction mismatch, out-of-tolerance
+    probabilities, or any non-GPU device fallback. Pure: no I/O or docker.
+    """
+    if result["predictions"] != golden["predictions"]:
+        raise AssertionError(f"Unexpected predictions: {result['predictions']}")
+    for actual_row, expected_row in zip(result["probabilities"], golden["probabilities"], strict=True):
+        for actual, expected in zip(actual_row, expected_row, strict=True):
+            if abs(actual - expected) > golden["probability_tolerance"]:
+                raise AssertionError(f"Unexpected probability: {actual} != {expected}")
+    if result["actual_device"] != "gpu":
+        raise AssertionError(f"Device fallback detected: {result}")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("framework", choices=SERVICE_IMAGES)
@@ -96,14 +112,7 @@ def main():
         result = json.loads(output.read("result.json"))
     collection_seconds = time.perf_counter() - collection_started
     golden = json.loads((run_dir / "inputs" / "input_1" / "golden.json").read_text())
-    if result["predictions"] != golden["predictions"]:
-        raise AssertionError(f"Unexpected predictions: {result['predictions']}")
-    for actual_row, expected_row in zip(result["probabilities"], golden["probabilities"], strict=True):
-        for actual, expected in zip(actual_row, expected_row, strict=True):
-            if abs(actual - expected) > golden["probability_tolerance"]:
-                raise AssertionError(f"Unexpected probability: {actual} != {expected}")
-    if result["actual_device"] != "gpu":
-        raise AssertionError(f"Device fallback detected: {result}")
+    validate_against_golden(result, golden)
 
     measurement = {
         "framework": args.framework,
