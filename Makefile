@@ -88,6 +88,36 @@ run-tensorflow-local: ## runs tensorflow image with local configuration
 	VALIDATION_DIR=validation-tensorflow \
 	docker compose --file docker-compose-local.yml up --abort-on-container-exit --exit-code-from runner-ml
 
+# GPU regression baseline -------------------------------------------------------------------------------
+# three layers, cheapest first:
+#   L1 pure validation logic (no docker)  L2 container contract (docker inspect, no GPU)  L3 full GPU regression
+define _validate_contract
+	# layer 2: container contract for $(1):$(2)
+	@uv run python tools/tests/test_container_contract.py $(1) --tag $(2)
+endef
+
+define _validate_regression
+	# layer 3: deterministic GPU regression fixture for $(1)
+	@uv run python tools/validate_ml_regression.py $(1) --tag $(2)
+endef
+
+.PHONY: test-unit
+test-unit: ## layer 1: pure regression validation logic tests (no docker required)
+	@uv run python tools/tests/test_regression_logic.py
+
+.PHONY: validate-pytorch
+validate-pytorch: test-unit build ## runs pytorch GPU regression (L1 logic, L2 contract, L3 GPU; override tag with TAG_PYTORCH=x.y.z)
+	@$(call _validate_contract,pytorch,${TAG_PYTORCH})
+	@$(call _validate_regression,pytorch,${TAG_PYTORCH})
+
+.PHONY: validate-tensorflow
+validate-tensorflow: test-unit build ## runs tensorflow GPU regression (L1 logic, L2 contract, L3 GPU; override tag with TAG_TENSORFLOW=x.y.z)
+	@$(call _validate_contract,tensorflow,${TAG_TENSORFLOW})
+	@$(call _validate_regression,tensorflow,${TAG_TENSORFLOW})
+
+.PHONY: validate-regression
+validate-regression: validate-pytorch validate-tensorflow ## runs both GPU regression fixtures
+
 .PHONY: publish-local
 publish-local: ## push to local throw away registry to test integration
 	docker tag simcore/services/comp/${IMAGE_PYTORCH}:${TAG_PYTORCH} registry:5000/simcore/services/comp/${IMAGE_PYTORCH}:${TAG_PYTORCH}
